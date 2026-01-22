@@ -1,4 +1,4 @@
-use std::{fmt::Display, path::Path};
+use std::path::{Component, Path};
 use thiserror::Error;
 use windows::core::PCWSTR;
 use windows::Win32::Storage::FileSystem::GetDriveTypeW;
@@ -12,54 +12,43 @@ pub enum NetPathError {
 }
 
 #[derive(Debug, PartialEq)]
+pub enum RemoteStatus {
+    Mounted,
+    Disconnected,
+    Unknown
+}
+
+#[derive(Debug, PartialEq)]
 pub enum PathType {
     Unknown,
     Removable,
     Fixed,
-    Remote,
+    Remote(RemoteStatus),
     CDRom,
     RamDisk
-}
-impl Display for PathType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
 }
 
 impl PathType {
     pub fn is_removable(&self) -> bool {
-        if self == &PathType::Removable {
-            return true;
-        }
-        false
+        matches!(self, PathType::Removable)
     }
     pub fn is_fixed(&self) -> bool {
-        if self == &PathType::Fixed {
-            return true;
-        }
-        false
+        matches!(self, PathType::Fixed)
     }
     pub fn is_remote(&self) -> bool {
-        if self == &PathType::Remote {
-            return true;
-        }
-        false
+        matches!(self, PathType::Remote(_))
     }
     pub fn is_cdrom(&self) -> bool {
-        if self == &PathType::CDRom {
-            return true;
-        }
-        false
+        matches!(self, PathType::CDRom)
     }
     pub fn is_ramdisk(&self) -> bool {
-        if self == &PathType::RamDisk {
-            return true;
-        }
-        false
+        matches!(self, PathType::RamDisk)
     }
 }
 
+#[cfg(target_os = "windows")]
 pub fn path_type(path: &Path) -> Result<PathType, NetPathError> {
+    //let drive = windows_root(&path).ok_or(NetPathError::InvalidPath(path.display().to_string()))?;
     let drive = path
         .to_string_lossy()
         .chars()
@@ -70,14 +59,22 @@ pub fn path_type(path: &Path) -> Result<PathType, NetPathError> {
 
     let path_type = unsafe { GetDriveTypeW(PCWSTR(wide.as_ptr()))};
 
-    Ok( match path_type {
-            0 => PathType::Unknown,
-            1 => return Err(NetPathError::InvalidPath(path.display().to_string())),
-            2 => PathType::Removable,
-            3 => PathType::Fixed,
-            4 => PathType::Remote,
-            5 => PathType::CDRom,
-            6 => PathType::RamDisk,
-            _ => return Err(NetPathError::PathTypeError)
-        })
+    match path_type {
+            0 => Ok(PathType::Unknown),
+            1 => Err(NetPathError::InvalidPath(path.display().to_string())),
+            2 => Ok(PathType::Removable),
+            3 => Ok(PathType::Fixed),
+            4 => Ok(PathType::Remote(RemoteStatus::Unknown)),
+            5 => Ok(PathType::CDRom),
+            6 => Ok(PathType::RamDisk),
+            _ => Err(NetPathError::PathTypeError)
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn windows_root(path: &Path) -> Option<String> {
+    match path.components().next() {
+        Some(Component::Prefix(prefix)) => Some(prefix.as_os_str().to_string_lossy().to_string()),
+        _ => None
+    }
 }
