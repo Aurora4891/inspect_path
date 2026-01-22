@@ -7,11 +7,11 @@ use windows::Win32::Storage::FileSystem::GetDriveTypeW;
 pub enum NetPathError {
     #[error("Failed to get path type")]
     PathTypeError,
-    #[error("Invalid path {0}")]
+    #[error("Invalid path '{0}'")]
     InvalidPath(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum PathType {
     Unknown,
     Removable,
@@ -23,6 +23,39 @@ pub enum PathType {
 impl Display for PathType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
+    }
+}
+
+impl PathType {
+    pub fn is_removable(&self) -> bool {
+        if self == &PathType::Removable {
+            return true;
+        }
+        false
+    }
+    pub fn is_fixed(&self) -> bool {
+        if self == &PathType::Fixed {
+            return true;
+        }
+        false
+    }
+    pub fn is_remote(&self) -> bool {
+        if self == &PathType::Remote {
+            return true;
+        }
+        false
+    }
+    pub fn is_cdrom(&self) -> bool {
+        if self == &PathType::CDRom {
+            return true;
+        }
+        false
+    }
+    pub fn is_ramdisk(&self) -> bool {
+        if self == &PathType::RamDisk {
+            return true;
+        }
+        false
     }
 }
 

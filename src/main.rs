@@ -1,10 +1,17 @@
 use std::path::Path;
 
 fn main() {
-    let p1 = netpath::path_type(Path::new("c:")).unwrap();
+    let p1 = netpath::path_type(Path::new("C:")).unwrap();
     let p2 = netpath::path_type(Path::new("D:\\blaa\\blaa")).unwrap();
     let p3 = netpath::path_type(Path::new("\\\\")).unwrap();
     let p4 = netpath::path_type(Path::new("C:\\")).unwrap();
+    if let Err(e) = netpath::path_type(Path::new("CTioewurouewjfndslfsdkfjksdfh")) {
+        println!("{e}");
+    }
 
-    println!("{p1} {p2} {p3} {p4}");
+    if p1.is_fixed() {
+        println!("it's fixed!")
+    }
+
+    println!("{p2} {p3} {p4}");
 }
