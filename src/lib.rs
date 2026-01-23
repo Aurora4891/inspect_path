@@ -1,7 +1,9 @@
 use std::path::{Component, Path};
 use thiserror::Error;
-use windows::core::PCWSTR;
-use windows::Win32::Storage::FileSystem::GetDriveTypeW;
+#[cfg(target_os = "windows")]
+use windows::{core::PCWSTR, Win32::Storage::FileSystem::GetDriveTypeW};
+#[cfg(target_family = "unix")]
+use nix::sys::statfs::statfs;
 
 #[derive(Debug, Error)]
 pub enum NetPathError {
@@ -9,6 +11,8 @@ pub enum NetPathError {
     PathTypeError,
     #[error("Invalid path '{0}'")]
     InvalidPath(String),
+    #[error("General Error '{0}'")]
+    General(String)
 }
 
 #[derive(Debug, PartialEq)]
@@ -26,6 +30,12 @@ pub enum PathType {
     Remote(RemoteStatus),
     CDRom,
     RamDisk
+}
+
+impl Default for PathType {
+    fn default() -> Self {
+        PathType::Unknown
+    }
 }
 
 impl PathType {
@@ -77,4 +87,11 @@ fn windows_root(path: &Path) -> Option<String> {
         Some(Component::Prefix(prefix)) => Some(prefix.as_os_str().to_string_lossy().to_string()),
         _ => None
     }
+}
+
+#[cfg(target_family = "unix")]
+pub fn path_type(path: &Path) -> Result<PathType, NetPathError> {
+    let stats = statfs(path)
+        .map_err(|e| NetPathError::General(e.to_string()))?;
+    Ok(PathType::Unknown)
 }
