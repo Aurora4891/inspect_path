@@ -1,0 +1,70 @@
+
+    #[cfg(target_os = "windows")]
+    pub fn path_type_with_status(path: &Path) -> Result<PathType, NetPathError> {
+        //let drive = windows_root(&path).ok_or(NetPathError::InvalidPath(path.display().to_string()))?;
+        let drive = path
+            .to_string_lossy()
+            .chars()
+            .take(2)
+            .collect::<String>();
+
+        let wide: Vec<u16> = drive.encode_utf16().chain(Some(0)).collect();
+
+        let path_type = unsafe { GetDriveTypeW(PCWSTR(wide.as_ptr()))};
+
+        match path_type {
+                0 => Ok(PathType::Unknown),
+                1 => Err(NetPathError::InvalidPath(path.display().to_string())),
+                2 => Ok(PathType::Removable),
+                3 => Ok(PathType::Fixed),
+                4 => Ok(PathType::Remote(remote_status(path))),
+                5 => Ok(PathType::CDRom),
+                6 => Ok(PathType::RamDisk),
+                _ => Err(NetPathError::PathTypeError)
+        }
+    }
+
+
+    #[cfg(target_os = "windows")]
+    pub fn remote_status(path: &Path) -> RemoteStatus {
+        match std::fs::metadata(path) {
+            Ok(_) => RemoteStatus::Mounted,
+            Err(e) => {
+                match e.kind() {
+                    std::io::ErrorKind::TimedOut => RemoteStatus::Disconnected,
+                    std::io::ErrorKind::NotFound => RemoteStatus::Disconnected,
+                    std::io::ErrorKind::NetworkDown => RemoteStatus::Disconnected,
+                    std::io::ErrorKind::NotConnected => RemoteStatus::Disconnected,
+                    std::io::ErrorKind::PermissionDenied => RemoteStatus::Mounted,
+                    _ => RemoteStatus::Other(e.to_string())
+                }
+            }
+        }
+    }
+
+
+    //let drive = windows_root(&path).ok_or(NetPathError::InvalidPath(path.display().to_string()))?;
+
+    #[cfg(target_os = "windows")]
+    fn _windows_root(path: &Path) -> Option<String> {
+        match path.components().next() {
+            Some(Component::Prefix(prefix)) => Some(prefix.as_os_str().to_string_lossy().to_string()),
+            _ => None
+        }
+    }
+
+    pub fn update_status(&mut self) {
+            match std::fs::metadata(&self.path) {
+                Ok(_) => self.status = PathStatus::Mounted,
+                Err(e) => {
+                    match e.kind() {
+                        std::io::ErrorKind::TimedOut => self.status = PathStatus::Disconnected,
+                        std::io::ErrorKind::NotFound => self.status = PathStatus::Disconnected,
+                        std::io::ErrorKind::NetworkDown => self.status = PathStatus::Disconnected,
+                        std::io::ErrorKind::NotConnected => self.status = PathStatus::Disconnected,
+                        std::io::ErrorKind::PermissionDenied => self.status = PathStatus::Mounted,
+                        _ => self.status = PathStatus::Other(e.to_string())
+                    }
+                }
+            }
+    }
