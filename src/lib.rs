@@ -5,7 +5,7 @@
 //! between fixed, removable, and remote paths, and provides additional
 //! information for network-backed paths.
 //!
-//! The primary entry point is [`platform::inspect_path`], which returns a [`PathInfo`] struct
+//! The primary entry point is [`inspect_path`], which returns a [`PathInfo`] struct
 //! describing the given path.
 //!
 //! # Platform support
