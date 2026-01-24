@@ -1,16 +1,15 @@
-//use std::path::Path;
-//use netpath::platform::inspect_path;
+use std::path::Path;
+use inspect_path::inspect_path;
 fn main() {
-/*
-    let p1 = netpath::inspect_path(Path::new("/"))
-        .unwrap();
-    let p2 = netpath::inspect_path(Path::new("/home"));
-    let p3 = netpath::inspect_path(Path::new("S:"));
+    #[cfg(target_family = "unix")]
+    let mut _p1 = inspect_path(Path::new("/")).unwrap();
+    #[cfg(target_family = "unix")]
+    let _p2 = inspect_path(Path::new("/run/user/1000/gvfs/smb-share:server=serverpi4.local,share=public"));
+    #[cfg(target_os = "windows")]
+    let p1 = inspect_path(Path::new("C:"));
+    #[cfg(target_os = "windows")]
+    let p2 = inspect_path(Path::new("C:"));
 
-    if p1.is_fixed() {
-        println!("{p1:#?}");
-    }
-
-    println!("{p2:#?} {p3:#?}");
-*/
+    _p1.update_status();
+    println!("{_p1:#?} {_p2:#?}");
 }

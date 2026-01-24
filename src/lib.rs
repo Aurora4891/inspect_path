@@ -37,6 +37,7 @@
 use std::path::PathBuf;
 use thiserror::Error;
 pub mod platform;
+pub use platform::inspect_path;
 
 #[derive(Debug, Error)]
 pub enum NetPathError {
@@ -65,7 +66,7 @@ pub enum RemoteType {
     WindowsShare,
     NFS,
     SMB,
-    AFP,
+    AFS,
     Other(String),
     Unknown
 }
