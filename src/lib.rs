@@ -31,16 +31,16 @@
 //!     println!("Fixed path detected");
 //! }
 //! # }
-//! 
+//!
 //! # #[cfg(target_os = "unix")]
 //! # {
 //! let info = inspect_path(Path::new("/home/")).unwrap();
-//! 
+//!
 //! if info.is_status_unknown() {
 //!     info.check_status();
 //!     if info.is_status_mounted() {
 //!         println!("Path Mounted!")
-//!     } 
+//!     }
 //! }
 //! # }
 //! ```
@@ -61,7 +61,7 @@ pub enum InspectPathError {
     #[error("Invalid path '{0}'")]
     InvalidPath(String),
     #[error("General Error '{0}'")]
-    General(String)
+    General(String),
 }
 
 /// The connection status of a path.
@@ -70,7 +70,7 @@ pub enum PathStatus {
     Mounted,
     Disconnected,
     Unknown,
-    Other(String)
+    Other(String),
 }
 
 /// The underlying remote filesystem type, if applicable.
@@ -83,7 +83,7 @@ pub enum RemoteType {
     SMB,
     AFS,
     Other(String),
-    Unknown
+    Unknown,
 }
 
 /// The general category of a filesystem path.
@@ -94,7 +94,7 @@ pub enum PathType {
     Fixed,
     Remote,
     CDRom,
-    RamDisk
+    RamDisk,
 }
 
 /// Information about a filesystem path, including its type and mount status.
@@ -134,19 +134,27 @@ impl PathInfo {
     pub fn is_status_unknown(&self) -> bool {
         matches!(self.status, PathStatus::Unknown)
     }
-    pub fn path(&self) -> &PathBuf { &self.path }
-    pub fn kind(&self) -> &PathType { &self.kind }
-    pub fn status(&self) -> &PathStatus { &self.status }
-    pub fn remote_type(&self) -> Option<&RemoteType> { self.remote_kind.as_ref() }
+    pub fn path(&self) -> &PathBuf {
+        &self.path
+    }
+    pub fn kind(&self) -> &PathType {
+        &self.kind
+    }
+    pub fn status(&self) -> &PathStatus {
+        &self.status
+    }
+    pub fn remote_type(&self) -> Option<&RemoteType> {
+        self.remote_kind.as_ref()
+    }
 
-/// Updates the mount status of the path.
-///
-/// This function attempts to access the underlying filesystem to determine
-/// whether the path is currently mounted or disconnected. On network paths,
-/// this may perform a blocking I/O operation.
-///
-/// The status is updated based on the result of probing the path and is
-/// stored in the `status` field.
+    /// Updates the mount status of the path.
+    ///
+    /// This function attempts to access the underlying filesystem to determine
+    /// whether the path is currently mounted or disconnected. On network paths,
+    /// this may perform a blocking I/O operation.
+    ///
+    /// The status is updated based on the result of probing the path and is
+    /// stored in the `status` field.
     pub fn check_status(&mut self) {
         self.status = platform::check_status(&self.path);
     }
@@ -158,7 +166,6 @@ mod tests {
     use std::path::Path;
     //use crate::platform::inspect_path;
 
-
     #[cfg(target_os = "windows")]
     #[test]
     fn fixed_path_type() {
@@ -166,7 +173,7 @@ mod tests {
             path: Path::new(r"C:\").to_path_buf(),
             kind: PathType::Fixed,
             remote_kind: None,
-            status: PathStatus::Unknown
+            status: PathStatus::Unknown,
         };
 
         let path = Path::new(r"C:\");
@@ -182,7 +189,7 @@ mod tests {
             path: Path::new(r"/etc/").to_path_buf(),
             kind: PathType::Fixed,
             remote_kind: None,
-            status: PathStatus::Unknown
+            status: PathStatus::Unknown,
         };
 
         let path = Path::new(r"/etc/");
