@@ -21,13 +21,28 @@
 //!
 //! ```rust
 //! use std::path::Path;
-//! use netpath::platform::inspect_path;
+//! use inspect_path::inspect_path;
 //!
-//! let info = inspect_path(Path::new(r"\\server\share")).unwrap();
+//! # #[cfg(target_os = "windows")]
+//! # {
+//! let info = inspect_path(Path::new(r"C:\")).unwrap();
 //!
-//! if info.is_remote() {
-//!     println!("Remote path detected");
+//! if info.is_fixed() {
+//!     println!("Fixed path detected");
 //! }
+//! # }
+//! 
+//! # #[cfg(target_os = "unix")]
+//! # {
+//! let info = inspect_path(Path::new("/home/")).unwrap();
+//! 
+//! if info.is_status_unknown() {
+//!     info.check_status();
+//!     if info.is_status_mounted() {
+//!         println!("Path Mounted!")
+//!     } 
+//! }
+//! # }
 //! ```
 //!
 //! # Notes
@@ -40,7 +55,7 @@ pub mod platform;
 pub use platform::inspect_path;
 
 #[derive(Debug, Error)]
-pub enum NetPathError {
+pub enum InspectPathError {
     #[error("Failed to get path type")]
     PathTypeError,
     #[error("Invalid path '{0}'")]
@@ -110,6 +125,15 @@ impl PathInfo {
     pub fn is_ramdisk(&self) -> bool {
         matches!(self.kind, PathType::RamDisk)
     }
+    pub fn is_status_mounted(&self) -> bool {
+        matches!(self.status, PathStatus::Mounted)
+    }
+    pub fn is_status_disconnected(&self) -> bool {
+        matches!(self.status, PathStatus::Disconnected)
+    }
+    pub fn is_status_unknown(&self) -> bool {
+        matches!(self.status, PathStatus::Unknown)
+    }
     pub fn path(&self) -> &PathBuf { &self.path }
     pub fn kind(&self) -> &PathType { &self.kind }
     pub fn status(&self) -> &PathStatus { &self.status }
@@ -123,8 +147,8 @@ impl PathInfo {
 ///
 /// The status is updated based on the result of probing the path and is
 /// stored in the `status` field.
-    pub fn update_status(&mut self) {
-        self.status = platform::update_status(&self.path)
+    pub fn check_status(&mut self) {
+        self.status = platform::check_status(&self.path);
     }
 }
 
@@ -132,18 +156,36 @@ impl PathInfo {
 mod tests {
     use super::*;
     use std::path::Path;
-    use crate::platform::inspect_path;
+    //use crate::platform::inspect_path;
 
+
+    #[cfg(target_os = "windows")]
     #[test]
-    fn remote_path_type() {
+    fn fixed_path_type() {
         let path_type = PathInfo {
-            path: Path::new("\\\\server\\share\\").to_path_buf(),
-            kind: PathType::Remote,
-            remote_kind: Some(RemoteType::Unknown),
+            path: Path::new(r"C:\").to_path_buf(),
+            kind: PathType::Fixed,
+            remote_kind: None,
             status: PathStatus::Unknown
         };
 
-        let path = Path::new("\\\\server\\share\\");
+        let path = Path::new(r"C:\");
+        let answer = inspect_path(path).unwrap();
+
+        assert_eq!(path_type, answer);
+    }
+
+    #[cfg(target_family = "unix")]
+    #[test]
+    fn fixed_path_type() {
+        let path_type = PathInfo {
+            path: Path::new(r"/etc/").to_path_buf(),
+            kind: PathType::Fixed,
+            remote_kind: None,
+            status: PathStatus::Unknown
+        };
+
+        let path = Path::new(r"/etc/");
         let answer = inspect_path(path).unwrap();
 
         assert_eq!(path_type, answer);

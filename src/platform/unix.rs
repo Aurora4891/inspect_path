@@ -1,5 +1,5 @@
 use std::path::Path;
-use crate::{PathInfo, PathType, PathStatus, RemoteType, NetPathError};
+use crate::{PathInfo, PathType, PathStatus, RemoteType, InspectPathError};
 use nix::sys::statfs::statfs;
 
 // Filesystem magic numbers from statfs (base-10)
@@ -36,9 +36,9 @@ pub const FS_FAT: i64       = 16390;        // 0x4006 (FAT / FAT32 / MSDOS)
 pub const FS_EXFAT: i64     = 538032816;    // 0x2011BAB0
 
 
-pub fn inspect_path(path: &Path) -> Result<PathInfo, NetPathError> {
+pub fn inspect_path(path: &Path) -> Result<PathInfo, InspectPathError> {
     let statfs = statfs(path)
-        .map_err(|e| NetPathError::General(e.to_string()))?;
+        .map_err(|e| InspectPathError::General(e.to_string()))?;
     
     let (kind, remote_kind) = match statfs.filesystem_type().0 {
         FS_EXT4 |
@@ -66,7 +66,7 @@ pub fn inspect_path(path: &Path) -> Result<PathInfo, NetPathError> {
     )
 }
 
-pub fn update_status(path: &Path) -> PathStatus {
+pub fn check_status(path: &Path) -> PathStatus {
     match std::fs::metadata(path) {
         Ok(_) => PathStatus::Mounted,
         Err(_) => PathStatus::Unknown,

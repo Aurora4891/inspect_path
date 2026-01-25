@@ -12,11 +12,11 @@ use std::path::Path;
 use crate::PathStatus;
 
 #[cfg(target_os = "windows")]
-pub fn update_status(path: &Path) -> PathStatus {
-    windows::update_status(path)
+pub fn check_status(path: &Path) -> PathStatus {
+    windows::check_status(path)
 }
 
 #[cfg(target_family = "unix")]
-pub fn update_status(path: &Path) -> PathStatus {
-    unix::update_status(path)
+pub fn check_status(path: &Path) -> PathStatus {
+    unix::check_status(path)
 }

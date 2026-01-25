@@ -2,6 +2,14 @@
 name = "inspect_path"
 version = "0.1.0"
 edition = "2024"
+description = "Cross-platform inspection of filesystem paths, including local and remote mounts."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Aurora4891/inspect_path"
+homepage = "https://github.com/Aurora4891/inspect_path"
+readme = "README.md"
+keywords   = ["path", "network", "mount", "windows", "linux"]
+categories = ["filesystem", "os"]
+
 
 [dependencies]
 thiserror = "2.0.18"

@@ -1,7 +1,7 @@
 
     #[cfg(target_os = "windows")]
-    pub fn path_type_with_status(path: &Path) -> Result<PathType, NetPathError> {
-        //let drive = windows_root(&path).ok_or(NetPathError::InvalidPath(path.display().to_string()))?;
+    pub fn path_type_with_status(path: &Path) -> Result<PathType, InspectPathError> {
+        //let drive = windows_root(&path).ok_or(InspectPathError::InvalidPath(path.display().to_string()))?;
         let drive = path
             .to_string_lossy()
             .chars()
@@ -14,13 +14,13 @@
 
         match path_type {
                 0 => Ok(PathType::Unknown),
-                1 => Err(NetPathError::InvalidPath(path.display().to_string())),
+                1 => Err(InspectPathError::InvalidPath(path.display().to_string())),
                 2 => Ok(PathType::Removable),
                 3 => Ok(PathType::Fixed),
                 4 => Ok(PathType::Remote(remote_status(path))),
                 5 => Ok(PathType::CDRom),
                 6 => Ok(PathType::RamDisk),
-                _ => Err(NetPathError::PathTypeError)
+                _ => Err(InspectPathError::PathTypeError)
         }
     }
 
@@ -43,7 +43,7 @@
     }
 
 
-    //let drive = windows_root(&path).ok_or(NetPathError::InvalidPath(path.display().to_string()))?;
+    //let drive = windows_root(&path).ok_or(InspectPathError::InvalidPath(path.display().to_string()))?;
 
     #[cfg(target_os = "windows")]
     fn _windows_root(path: &Path) -> Option<String> {
