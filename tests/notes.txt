@@ -1,0 +1,122 @@
+
+    #[cfg(target_os = "windows")]
+    pub fn path_type_with_status(path: &Path) -> Result<PathType, InspectPathError> {
+        //let drive = windows_root(&path).ok_or(InspectPathError::InvalidPath(path.display().to_string()))?;
+        let drive = path
+            .to_string_lossy()
+            .chars()
+            .take(2)
+            .collect::<String>();
+
+        let wide: Vec<u16> = drive.encode_utf16().chain(Some(0)).collect();
+
+        let path_type = unsafe { GetDriveTypeW(PCWSTR(wide.as_ptr()))};
+
+        match path_type {
+                0 => Ok(PathType::Unknown),
+                1 => Err(InspectPathError::InvalidPath(path.display().to_string())),
+                2 => Ok(PathType::Removable),
+                3 => Ok(PathType::Fixed),
+                4 => Ok(PathType::Remote(remote_status(path))),
+                5 => Ok(PathType::CDRom),
+                6 => Ok(PathType::RamDisk),
+                _ => Err(InspectPathError::PathTypeError)
+        }
+    }
+
+
+    #[cfg(target_os = "windows")]
+    pub fn remote_status(path: &Path) -> RemoteStatus {
+        match std::fs::metadata(path) {
+            Ok(_) => RemoteStatus::Mounted,
+            Err(e) => {
+                match e.kind() {
+                    std::io::ErrorKind::TimedOut => RemoteStatus::Disconnected,
+                    std::io::ErrorKind::NotFound => RemoteStatus::Disconnected,
+                    std::io::ErrorKind::NetworkDown => RemoteStatus::Disconnected,
+                    std::io::ErrorKind::NotConnected => RemoteStatus::Disconnected,
+                    std::io::ErrorKind::PermissionDenied => RemoteStatus::Mounted,
+                    _ => RemoteStatus::Other(e.to_string())
+                }
+            }
+        }
+    }
+
+
+    //let drive = windows_root(&path).ok_or(InspectPathError::InvalidPath(path.display().to_string()))?;
+
+    #[cfg(target_os = "windows")]
+    fn _windows_root(path: &Path) -> Option<String> {
+        match path.components().next() {
+            Some(Component::Prefix(prefix)) => Some(prefix.as_os_str().to_string_lossy().to_string()),
+            _ => None
+        }
+    }
+
+    pub fn update_status(&mut self) {
+            match std::fs::metadata(&self.path) {
+                Ok(_) => self.status = PathStatus::Mounted,
+                Err(e) => {
+                    match e.kind() {
+                        std::io::ErrorKind::TimedOut => self.status = PathStatus::Disconnected,
+                        std::io::ErrorKind::NotFound => self.status = PathStatus::Disconnected,
+                        std::io::ErrorKind::NetworkDown => self.status = PathStatus::Disconnected,
+                        std::io::ErrorKind::NotConnected => self.status = PathStatus::Disconnected,
+                        std::io::ErrorKind::PermissionDenied => self.status = PathStatus::Mounted,
+                        _ => self.status = PathStatus::Other(e.to_string())
+                    }
+                }
+            }
+    }
+
+Filesystem Type,Magic Number (Hex),Common Use Case
+EXT4 / EXT3 / EXT2,0xEF53,Standard Linux fixed disk partitions.
+NFS,0x6969,Network File System (Remote/Network drive).
+SMB / CIFS,0xFF534D42,Windows-style network shares.
+MSDOS / FAT,0x4D44,USB sticks and older SD cards (Removable).
+NTFS,0x5346414F,Windows partitions (often external HDDs).
+BTRFS,0x9123683E,"Modern Linux ""Copy-on-Write"" drives."
+XFS,0x58465342,High-performance enterprise storage.
+TMPFS,0x01021994,RAM disks (volatile storage).
+PROC,0x9FA0,The /proc virtual filesystem (System info).
+SYSFS,0x62656572,The /sys virtual filesystem (Device info).
+ISOFS,0x9660,CD-ROMs and DVD-ROMs.
+HUGETLBFS,0x958458F6,Large page memory allocation.
+
+/proc/self/mountinfo
+
+26 32 0:23 / /sys rw,nosuid,nodev,noexec,relatime shared:7 - sysfs sysfs rw
+27 32 0:24 / /proc rw,nosuid,nodev,noexec,relatime shared:13 - proc proc rw
+28 32 0:6 / /dev rw,nosuid,relatime shared:2 - devtmpfs udev rw,size=1865452k,nr_inodes=466363,mode=755,inode64
+29 28 0:25 / /dev/pts rw,nosuid,noexec,relatime shared:3 - devpts devpts rw,gid=5,mode=620,ptmxmode=000
+30 32 0:26 / /run rw,nosuid,nodev,noexec,relatime shared:5 - tmpfs tmpfs rw,size=382124k,mode=755,inode64
+31 26 0:27 / /sys/firmware/efi/efivars rw,nosuid,nodev,noexec,relatime shared:8 - efivarfs efivarfs rw
+32 2 259:2 / / rw,relatime shared:1 - ext4 /dev/nvme0n1p2 rw,errors=remount-ro
+34 28 0:28 / /dev/shm rw,nosuid,nodev shared:4 - tmpfs tmpfs rw,inode64
+35 30 0:29 / /run/lock rw,nosuid,nodev,noexec,relatime shared:6 - tmpfs tmpfs rw,size=5120k,inode64
+36 26 0:30 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime shared:10 - cgroup2 cgroup2 rw,nsdelegate,memory_recursiveprot
+37 26 0:31 / /sys/fs/pstore rw,nosuid,nodev,noexec,relatime shared:11 - pstore pstore rw
+38 26 0:32 / /sys/fs/bpf rw,nosuid,nodev,noexec,relatime shared:12 - bpf bpf rw,mode=700
+39 27 0:33 / /proc/sys/fs/binfmt_misc rw,relatime shared:14 - autofs systemd-1 rw,fd=32,pgrp=1,timeout=0,minproto=5,maxproto=5,direct,pipe_ino=5297
+40 28 0:20 / /dev/mqueue rw,nosuid,nodev,noexec,relatime shared:15 - mqueue mqueue rw
+41 26 0:8 / /sys/kernel/debug rw,nosuid,nodev,noexec,relatime shared:16 - debugfs debugfs rw
+42 28 0:34 / /dev/hugepages rw,nosuid,nodev,relatime shared:17 - hugetlbfs hugetlbfs rw,pagesize=2M
+43 26 0:13 / /sys/kernel/tracing rw,nosuid,nodev,noexec,relatime shared:18 - tracefs tracefs rw
+44 26 0:35 / /sys/fs/fuse/connections rw,nosuid,nodev,noexec,relatime shared:19 - fusectl fusectl rw
+45 26 0:21 / /sys/kernel/config rw,nosuid,nodev,noexec,relatime shared:20 - configfs configfs rw
+47 32 259:1 / /boot/efi rw,relatime shared:30 - vfat /dev/nvme0n1p1 rw,fmask=0077,dmask=0077,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro
+49 39 0:36 / /proc/sys/fs/binfmt_misc rw,nosuid,nodev,noexec,relatime shared:46 - binfmt_misc binfmt_misc rw
+505 30 0:62 / /run/user/1000 rw,nosuid,nodev,relatime shared:635 - tmpfs tmpfs rw,size=382120k,nr_inodes=95530,mode=700,uid=1000,gid=1000,inode64
+704 505 0:63 / /run/user/1000/gvfs rw,nosuid,nodev,relatime shared:677 - fuse.gvfsd-fuse gvfsd-fuse rw,user_id=1000,group_id=1000
+56 505 0:55 / /run/user/1000/doc rw,nosuid,nodev,relatime shared:497 - fuse.portal portal rw,user_id=1000,group_id=1000
+231 32 8:1 / /media/blaa/0097-98D8 rw,nosuid,nodev,relatime shared:538 - vfat /dev/sda1 rw,uid=1000,gid=1000,fmask=0022,dmask=0022,codepage=437,iocharset=iso8859-1,short>
+
+match fs_type {
+    "proc" | "sysfs" | "debugfs" | "tracefs" |
+    "cgroup" | "cgroup2" | "configfs" |
+    "securityfs" | "pstore" | "bpf" => PathType::Virtual,
+    ...
+}
+
+
+/sys/class/block/nvme0n1/removable 

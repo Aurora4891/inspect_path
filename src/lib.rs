@@ -34,7 +34,7 @@
 //!
 //! # #[cfg(target_os = "unix")]
 //! # {
-//! let info = inspect_path(Path::new("/home/")).unwrap();
+//! let mut info = inspect_path(Path::new("/home/")).unwrap();
 //!
 //! if info.is_status_unknown() {
 //!     info.check_status();
