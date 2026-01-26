@@ -49,13 +49,19 @@
 //!
 //! Some operations (such as determining network mount status) may perform
 //! blocking I/O depending on the platform and filesystem.
-use std::path::PathBuf;
+use std::{num::ParseIntError, path::PathBuf};
 use thiserror::Error;
 pub mod platform;
 pub use platform::inspect_path;
 
 #[derive(Debug, Error)]
 pub enum InspectPathError {
+    #[error("Parse Int Error")]
+    ParseInt(#[from] ParseIntError),
+    #[error("Parse General Error")]
+    ParseGen,
+    #[error("I/O Error")]
+    Io(#[from] std::io::Error),
     #[error("Failed to get path type")]
     PathTypeError,
     #[error("Invalid path '{0}'")]

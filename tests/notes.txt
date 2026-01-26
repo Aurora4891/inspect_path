@@ -118,5 +118,5 @@ match fs_type {
     ...
 }
 
-
+/sys/dev/block/8:0/removable
 /sys/class/block/nvme0n1/removable 
