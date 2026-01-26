@@ -1,6 +1,10 @@
 use crate::{InspectPathError, PathInfo, PathStatus, PathType, RemoteType};
 use std::{io::ErrorKind, path::Path};
-use windows::{Win32::Storage::FileSystem::GetDriveTypeW, core::PCWSTR};
+use windows::{Win32::Storage::FileSystem::GetDriveTypeW, core::{PWSTR, PCWSTR}};
+use windows::Win32::NetworkManagement::WNet::{
+    WNetAddConnection2W, NETRESOURCEW, RESOURCETYPE_DISK,
+};
+use windows::Win32::Foundation::NO_ERROR;
 /// Inspects a filesystem path and returns detailed information about it.
 ///
 /// This function determines the general type of the path (fixed, removable,
@@ -54,5 +58,39 @@ pub fn check_status(path: &Path) -> PathStatus {
 
             _ => PathStatus::Unknown,
         },
+    }
+}
+
+fn to_pwstr(s: &str) -> Vec<u16> {
+    let mut v: Vec<u16> = s.encode_utf16().collect();
+    v.push(0); // null terminator
+    v
+}
+
+pub fn connect_drive(local: &str, remote: &str) -> Result<(), InspectPathError> {
+let mut local = to_pwstr(local); // "Z:"
+let mut remote = to_pwstr(remote); // r"\\server\share"
+
+let mut nr = NETRESOURCEW {
+    dwType: RESOURCETYPE_DISK,
+    lpLocalName: PWSTR::from_raw(local.as_mut_ptr()),
+    lpRemoteName: PWSTR::from_raw(remote.as_mut_ptr()),
+    lpProvider: PWSTR::null(),
+    ..Default::default()
+    };
+
+    let result = unsafe {
+        WNetAddConnection2W(
+            &mut nr,
+            PCWSTR::null(), // password
+            PCWSTR::null(), // username
+            windows::Win32::NetworkManagement::WNet::NET_CONNECT_FLAGS(0),
+        )
+    };
+
+    if result == NO_ERROR {
+        Ok(())
+    } else {
+        Err(InspectPathError::General("Win32_Error".into()))
     }
 }

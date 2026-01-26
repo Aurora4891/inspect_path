@@ -8,6 +8,7 @@ pub use unix::inspect_path;
 #[cfg(target_os = "windows")]
 pub use windows::inspect_path;
 
+use crate::InspectPathError;
 use crate::PathStatus;
 use std::path::Path;
 
@@ -15,6 +16,12 @@ use std::path::Path;
 pub fn check_status(path: &Path) -> PathStatus {
     windows::check_status(path)
 }
+#[cfg(target_os = "windows")]
+pub fn connect_drive(local: &str, remote: &str) -> Result<(), InspectPathError> {
+    windows::connect_drive(local, remote)
+}
+
+
 
 #[cfg(target_family = "unix")]
 pub fn check_status(path: &Path) -> PathStatus {
