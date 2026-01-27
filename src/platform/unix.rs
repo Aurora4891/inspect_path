@@ -39,6 +39,15 @@ pub const FS_FAT: i64 = 16390; // 0x4006 (FAT / FAT32 / MSDOS)
 /// Extended FAT
 pub const FS_EXFAT: i64 = 538032816; // 0x2011BAB0
 
+pub fn inspect_path_new(path: &Path) -> Result<PathInfo, InspectPathError> {
+    let path_split: Vec<&str> = path
+        .display().to_string().split('/').collect();
+    for line in mountinfo_into_vec(&mountinfo_to_string()?)? {
+
+    }
+    Err(InspectPathError::PathTypeError)
+}
+
 pub fn inspect_path(path: &Path) -> Result<PathInfo, InspectPathError> {
     let statfs = statfs(path).map_err(|e| InspectPathError::General(e.to_string()))?;
 

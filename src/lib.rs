@@ -101,6 +101,7 @@ pub enum PathType {
     Remote,
     CDRom,
     RamDisk,
+    Virtual(String),
 }
 
 /// Information about a filesystem path, including its type and mount status.
