@@ -39,13 +39,23 @@ pub const FS_FAT: i64 = 16390; // 0x4006 (FAT / FAT32 / MSDOS)
 /// Extended FAT
 pub const FS_EXFAT: i64 = 538032816; // 0x2011BAB0
 
-pub fn inspect_path_new(path: &Path) -> Result<PathInfo, InspectPathError> {
-    let path_split: Vec<&str> = path
-        .display().to_string().split('/').collect();
-    for line in mountinfo_into_vec(&mountinfo_to_string()?)? {
+pub fn inspect_path_new(path: &Path) -> Result<(), InspectPathError> {
+    let path_split = path
+        .display().to_string();
+    let path_split: Vec<&str> = path_split.split('/').collect();
+    let mut length = path_split.len();
+    let miv = mountinfo_into_vec(&mountinfo_to_string()?)?;
 
+    for line in &miv {
+        let split: Vec<&str> = 
+            line.mount_point.to_str()
+            .ok_or(InspectPathError::General("Convert PathBuf to str Error".into()))?
+            .split('/').collect();
+        if length > split.len() {
+            length = split.len().clone();
+        }
     }
-    Err(InspectPathError::PathTypeError)
+    Ok(())
 }
 
 pub fn inspect_path(path: &Path) -> Result<PathInfo, InspectPathError> {

@@ -12,6 +12,7 @@ categories = ["filesystem", "os"]
 
 
 [dependencies]
+cfg-if = "1.0.4"
 thiserror = "2.0.18"
 
 [target.'cfg(windows)'.dependencies]
