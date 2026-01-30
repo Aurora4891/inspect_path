@@ -1,22 +1,20 @@
-#[cfg(target_family = "unix")]
-mod unix;
-#[cfg(target_os = "windows")]
-mod windows;
-
-#[cfg(target_family = "unix")]
-pub use unix::inspect_path;
-#[cfg(target_os = "windows")]
-pub use windows::inspect_path;
-
 use crate::PathStatus;
 use std::path::Path;
 
-#[cfg(target_os = "windows")]
-pub fn check_status(path: &Path) -> PathStatus {
-    windows::check_status(path)
-}
-
-#[cfg(target_family = "unix")]
-pub fn check_status(path: &Path) -> PathStatus {
-    unix::check_status(path)
+cfg_if::cfg_if! {
+    if #[cfg(target_os = "windows")] {
+        mod windows;
+        pub use windows::{inspect_path, inspect_path_and_status, connect_drive};
+        pub fn check_status(path: &Path) -> PathStatus {
+            windows::check_status(path)
+        }
+    } else if #[cfg(target_family = "unix")] {
+        mod unix;
+        pub use unix::{inspect_path, inspect_path_new};
+        pub fn check_status(path: &Path) -> PathStatus {
+            unix::check_status(path)
+        }
+    } else {
+        compile_error!("unsupported platform");
+    }
 }

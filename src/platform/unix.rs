@@ -1,7 +1,11 @@
 use crate::{InspectPathError, PathInfo, PathStatus, PathType, RemoteType};
 use nix::sys::statfs::statfs;
-use std::path::Path;
+use std::{
+    fs::read_to_string,
+    path::{Path, PathBuf},
+};
 
+const MOUNTINFO_PATH: &str = "/proc/self/mountinfo";
 // Filesystem magic numbers from statfs (base-10)
 /// Network File System (NFS)
 pub const FS_NFS: i64 = 26985;
@@ -61,5 +65,102 @@ pub fn check_status(path: &Path) -> PathStatus {
     match std::fs::metadata(path) {
         Ok(_) => PathStatus::Mounted,
         Err(_) => PathStatus::Unknown,
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct DeviceNumber {
+    major: u32,
+    minor: u32,
+}
+
+#[derive(Debug, PartialEq)]
+struct MountInfo {
+    mount_id: u32,
+    parent_id: u32,
+    device_number: DeviceNumber,
+    fs_root: PathBuf,
+    mount_point: PathBuf,
+    fs_type: String,
+    block_device: PathBuf,
+    mount_options: String,
+}
+fn mountinfo_to_string() -> Result<String, InspectPathError> {
+    let mountinfo_file = read_to_string(Path::new(MOUNTINFO_PATH))?;
+    Ok(mountinfo_file)
+}
+
+fn mountinfo_into_vec(s: &str) -> Result<Vec<MountInfo>, InspectPathError> {
+    let mut out: Vec<MountInfo> = Vec::new();
+
+    for line in s.lines() {
+        let (pre, post) = line.split_once(" - ").ok_or(InspectPathError::ParseGen)?;
+
+        let mut vfs = pre.trim().split_whitespace();
+
+        let mount_id: u32 = vfs.next().ok_or(InspectPathError::ParseGen)?.parse()?;
+        let parent_id: u32 = vfs.next().ok_or(InspectPathError::ParseGen)?.parse()?;
+
+        let (major, minor) = vfs
+            .next()
+            .ok_or(InspectPathError::ParseGen)?
+            .split_once(":")
+            .ok_or(InspectPathError::ParseGen)?;
+
+        let device_number: DeviceNumber = DeviceNumber {
+            major: major.parse()?,
+            minor: minor.parse()?,
+        };
+
+        let fs_root: PathBuf = vfs.next().ok_or(InspectPathError::ParseGen)?.into();
+        let mount_point: PathBuf = vfs.next().ok_or(InspectPathError::ParseGen)?.into();
+        // rest of vfs not parsed
+
+        let mut fs = post.trim().split_whitespace();
+
+        let fs_type: String = fs.next().ok_or(InspectPathError::ParseGen)?.into();
+        let block_device: PathBuf = fs.next().ok_or(InspectPathError::ParseGen)?.into();
+        let mount_options: String = fs.next().ok_or(InspectPathError::ParseGen)?.into();
+
+        let value = MountInfo {
+            mount_id,
+            parent_id,
+            device_number,
+            fs_root,
+            mount_point,
+            fs_type,
+            block_device,
+            mount_options,
+        };
+        out.push(value);
+    }
+    Ok(out)
+}
+
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mountinfo_to_vec_virtual() {
+        let line =
+            "40 28 0:20 / /dev/mqueue rw,nosuid,nodev,noexec,relatime shared:15 - mqueue mqueue rw";
+        let right = mountinfo_into_vec(line).unwrap();
+
+        let device_number = DeviceNumber {
+            major: 0,
+            minor: 20,
+        };
+        let left = vec![MountInfo {
+            mount_id: 40,
+            parent_id: 28,
+            device_number,
+            fs_root: PathBuf::from("/"),
+            mount_point: PathBuf::from("/dev/mqueue"),
+            fs_type: String::from("mqueue"),
+            block_device: PathBuf::from("mqueue"),
+            mount_options: String::from("rw"),
+        }];
+
+        assert_eq!(left, right);
     }
 }

@@ -49,13 +49,19 @@
 //!
 //! Some operations (such as determining network mount status) may perform
 //! blocking I/O depending on the platform and filesystem.
-use std::path::PathBuf;
+use std::{num::ParseIntError, path::PathBuf};
 use thiserror::Error;
 pub mod platform;
-pub use platform::inspect_path;
+pub use platform::{check_status, connect_drive, inspect_path, inspect_path_and_status};
 
 #[derive(Debug, Error)]
 pub enum InspectPathError {
+    #[error("Parse Int Error")]
+    ParseInt(#[from] ParseIntError),
+    #[error("Parse General Error")]
+    ParseGen,
+    #[error("I/O Error")]
+    Io(#[from] std::io::Error),
     #[error("Failed to get path type")]
     PathTypeError,
     #[error("Invalid path '{0}'")]
@@ -78,7 +84,7 @@ pub enum PathStatus {
 /// This value is meaningful only when the path is classified as remote.
 #[derive(Debug, PartialEq)]
 pub enum RemoteType {
-    WindowsShare,
+    WebDAV,
     NFS,
     SMB,
     AFS,
