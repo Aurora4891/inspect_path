@@ -1,6 +1,6 @@
 [package]
 name = "inspect_path"
-version = "0.2.0"
+version = "0.3.3"
 edition = "2024"
 description = "Cross-platform inspection of filesystem paths, including local and remote mounts."
 license = "MIT OR Apache-2.0"
@@ -10,6 +10,12 @@ readme = "README.md"
 keywords   = ["path", "network", "mount", "windows", "linux"]
 categories = ["filesystem", "os"]
 
+[[example]]
+name = "inspect"
+doc-scrape-examples = false
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 cfg-if = "1.0.4"

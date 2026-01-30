@@ -39,21 +39,31 @@ pub const FS_FAT: i64 = 16390; // 0x4006 (FAT / FAT32 / MSDOS)
 /// Extended FAT
 pub const FS_EXFAT: i64 = 538032816; // 0x2011BAB0
 
-pub fn inspect_path_new(path: &Path) -> Result<(), InspectPathError> {
+fn inspect_path_new(path: &Path) -> Result<(), InspectPathError> {
     let miv = mountinfo_into_vec(&mountinfo_to_string()?)?;
     let mut candidates: Vec<&MountInfo> = Vec::new();
     for line in &miv {
         if path.starts_with(&line.mount_point) {
-            candidates.push(&line);
+            candidates.push(line);
         }
     }
     candidates.sort_by_key(|m| m.mount_point.components().count());
-    let best = candidates
-        .last().ok_or(InspectPathError::ParseGen)?;
+    let best = candidates.last().ok_or(InspectPathError::ParseGen)?;
     dbg!(&best);
     Ok(())
 }
 
+/// Inspects a filesystem path and returns detailed information about it.
+///
+/// This function determines the general type of the path (fixed, removable,
+/// remote, etc.) and returns a [`PathInfo`] structure containing the results.
+///
+/// On some platforms, this function may perform system calls to query the
+/// underlying filesystem.
+///
+/// # Errors
+///
+/// Returns an error if the path is invalid or its type cannot be determined.
 pub fn inspect_path(path: &Path) -> Result<PathInfo, InspectPathError> {
     let statfs = statfs(path).map_err(|e| InspectPathError::General(e.to_string()))?;
 
@@ -76,6 +86,65 @@ pub fn inspect_path(path: &Path) -> Result<PathInfo, InspectPathError> {
     })
 }
 
+/// Probes a path to determine its current mount/connection status.
+///
+/// This function attempts to access filesystem metadata for the given path
+/// and classifies its availability based on the result.
+///
+/// It is primarily used to detect whether a remote or removable filesystem
+/// is currently reachable.
+///
+/// # Returns
+///
+/// - [`PathStatus::Mounted`] — The path responded to metadata access
+/// - [`PathStatus::Disconnected`] — The path appears unavailable (typically
+///   network or device not connected) *(Windows only — see below)*
+/// - [`PathStatus::Unknown`] — Status could not be determined reliably
+///
+/// # Behavior
+///
+/// This function performs a real filesystem probe using `std::fs::metadata`.
+/// On remote filesystems this may involve network I/O and can block for a
+/// noticeable amount of time if the target is unreachable.
+///
+/// # Platform differences
+///
+/// ## Windows
+///
+/// Error kinds are mapped to status:
+///
+/// - `NotFound`, `TimedOut`, `NetworkDown`, `NotConnected` → Disconnected
+/// - `PermissionDenied` → Mounted (exists but access restricted)
+/// - Other errors → Unknown
+///
+/// ## Unix
+///
+/// Currently uses a simpler probe:
+///
+/// - Success → Mounted
+/// - Any error → Unknown
+///
+/// (Future versions may distinguish disconnected network mounts more precisely.)
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use std::path::Path;
+/// use inspect_path::inspect_path;
+///
+/// let mut info = inspect_path(Path::new("/")).unwrap();
+/// info.check_status();
+///
+/// if info.is_status_mounted() {
+///     println!("Path is reachable");
+/// }
+/// ```
+///
+/// # Notes
+///
+/// This is a heuristic check. Some filesystems may report as available even
+/// if later operations fail, and some virtual filesystems may always appear
+/// mounted.
 pub fn check_status(path: &Path) -> PathStatus {
     match std::fs::metadata(path) {
         Ok(_) => PathStatus::Mounted,
@@ -111,7 +180,7 @@ fn mountinfo_into_vec(s: &str) -> Result<Vec<MountInfo>, InspectPathError> {
     for line in s.lines() {
         let (pre, post) = line.split_once(" - ").ok_or(InspectPathError::ParseGen)?;
 
-        let mut vfs = pre.trim().split_whitespace();
+        let mut vfs = pre.split_whitespace();
 
         let mount_id: u32 = vfs.next().ok_or(InspectPathError::ParseGen)?.parse()?;
         let parent_id: u32 = vfs.next().ok_or(InspectPathError::ParseGen)?.parse()?;
@@ -131,7 +200,7 @@ fn mountinfo_into_vec(s: &str) -> Result<Vec<MountInfo>, InspectPathError> {
         let mount_point: PathBuf = vfs.next().ok_or(InspectPathError::ParseGen)?.into();
         // rest of vfs not parsed
 
-        let mut fs = post.trim().split_whitespace();
+        let mut fs = post.split_whitespace();
 
         let fs_type: String = fs.next().ok_or(InspectPathError::ParseGen)?.into();
         let block_device: PathBuf = fs.next().ok_or(InspectPathError::ParseGen)?.into();
