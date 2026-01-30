@@ -1,28 +1,43 @@
+fn get_connection(wide: &Vec<u16>) -> Option<String> {
+    let mut size: u32 = 0;
+    let mut buffer: Vec<u16> = String::new().encode_utf16().chain(Some(0)).collect();
 
-    #[cfg(target_os = "windows")]
-    pub fn path_type_with_status(path: &Path) -> Result<PathType, InspectPathError> {
-        //let drive = windows_root(&path).ok_or(InspectPathError::InvalidPath(path.display().to_string()))?;
-        let drive = path
-            .to_string_lossy()
-            .chars()
-            .take(2)
-            .collect::<String>();
+    let result1 = unsafe { WNetGetConnectionW(PCWSTR(wide.as_ptr()), None,&mut size) };
 
-        let wide: Vec<u16> = drive.encode_utf16().chain(Some(0)).collect();
+    if result1 != ERROR_MORE_DATA { return None; }
 
-        let path_type = unsafe { GetDriveTypeW(PCWSTR(wide.as_ptr()))};
+    let result2 = unsafe { WNetGetConnectionW(PCWSTR(wide.as_ptr()), Some(PWSTR::from_raw(buffer.as_mut_ptr())),&mut size) };
 
-        match path_type {
-                0 => Ok(PathType::Unknown),
-                1 => Err(InspectPathError::InvalidPath(path.display().to_string())),
-                2 => Ok(PathType::Removable),
-                3 => Ok(PathType::Fixed),
-                4 => Ok(PathType::Remote(remote_status(path))),
-                5 => Ok(PathType::CDRom),
-                6 => Ok(PathType::RamDisk),
-                _ => Err(InspectPathError::PathTypeError)
-        }
-    }
+    if result2 != NO_ERROR { return None; }
+
+    let len = buffer.iter().position(|&c| c== 0 ).unwrap_or(buffer.len());
+    Some(String::from_utf16_lossy(&buffer[..len]))
+
+}
+
+fn get_provider_name(wide: &Vec<u16>, dwnettype:u32) -> Option<String> {
+    let mut size: u32 = 0;
+    let mut buffer: Vec<u16> = wide.clone();
+
+    let result3 = unsafe { WNetGetProviderNameW(dwnettype, PWSTR::from_raw(buffer.as_mut_ptr()),&mut size) };
+    
+    dbg!(&result3);
+    if result3 != ERROR_MORE_DATA { return None; }
+
+    let result4 = unsafe { WNetGetProviderNameW(dwnettype, PWSTR::from_raw(buffer.as_mut_ptr()),&mut size) };
+
+    dbg!(&result4);
+    if result4 != NO_ERROR { return None; }
+
+    let len = buffer.iter().position(|&c| c== 0 ).unwrap_or(buffer.len());
+    Some(String::from_utf16_lossy(&buffer[..len]))
+}
+
+fn win_string(s: &String) -> Vec<u16> {
+    let drive = s.chars().collect::<String>();
+    drive.encode_utf16().chain(Some(0)).collect()
+}
+
 
 
     #[cfg(target_os = "windows")]

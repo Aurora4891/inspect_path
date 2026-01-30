@@ -1,10 +1,10 @@
 use crate::PathStatus;
 use std::path::Path;
 
-cfg_if::cfg_if!{
+cfg_if::cfg_if! {
     if #[cfg(target_os = "windows")] {
         mod windows;
-        pub use windows::inspect_path;
+        pub use windows::{inspect_path, inspect_path_and_status, connect_drive};
         pub fn check_status(path: &Path) -> PathStatus {
             windows::check_status(path)
         }
