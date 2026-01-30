@@ -205,44 +205,6 @@ pub fn check_status(path: &Path) -> PathStatus {
     }
 }
 
-/// Inspects a filesystem path and immediately checks its mount status.
-///
-/// This is a convenience wrapper around [`inspect_path`] that also calls
-/// [`PathInfo::check_status`] before returning. It is useful when you want
-/// both the path classification and its current availability in one step.
-///
-/// On network-backed paths (such as SMB or WebDAV shares), checking status
-/// may perform blocking I/O and can be slower than calling [`inspect_path`]
-/// alone.
-///
-/// # Errors
-///
-/// Returns an error if the path type cannot be determined or if the platform
-/// inspection call fails.
-///
-/// # Examples
-///
-/// ```rust
-/// use std::path::Path;
-/// use inspect_path::inspect_path_and_status;
-///
-/// let info = inspect_path_and_status(Path::new(r"C:\")).unwrap();
-///
-/// if info.is_status_mounted() {
-///     println!("Path is available");
-/// }
-/// ```
-///
-/// # Platform behavior
-///
-/// - **Windows:** Uses Win32 APIs and filesystem probing
-/// - **Unix:** Uses `statfs` and filesystem metadata probing
-pub fn inspect_path_and_status(path: &Path) -> Result<PathInfo, InspectPathError> {
-    let mut inspect = inspect_path(path)?;
-    inspect.check_status();
-    Ok(inspect)
-}
-
 fn to_pwstr(s: &str) -> Vec<u16> {
     let mut v: Vec<u16> = s.encode_utf16().collect();
     v.push(0); // null terminator
@@ -269,9 +231,9 @@ fn to_pwstr(s: &str) -> Vec<u16> {
 /// # Examples
 ///
 /// ```rust,no_run
-/// use inspect_path::connect_drive;
+/// use inspect_path::mount_path;
 ///
-/// connect_drive("Z:", r"\\server\share").unwrap();
+/// mount_path("Z:", r"\\server\share").unwrap();
 /// ```
 ///
 /// # Platform
@@ -289,7 +251,7 @@ fn to_pwstr(s: &str) -> Vec<u16> {
 ///
 /// - [`inspect_path`] — inspect mapped drives after connecting
 /// - [`inspect_path_and_status`] — inspect and verify availability
-pub fn connect_drive(local: &str, remote: &str) -> Result<(), InspectPathError> {
+pub fn mount_path(local: &str, remote: &str) -> Result<(), InspectPathError> {
     let mut local = to_pwstr(local); // "Z:"
     let mut remote = to_pwstr(remote); // r"\\server\share"
 

@@ -48,8 +48,7 @@ pub fn inspect_path_new(path: &Path) -> Result<(), InspectPathError> {
         }
     }
     candidates.sort_by_key(|m| m.mount_point.components().count());
-    let best = candidates
-        .last().ok_or(InspectPathError::ParseGen)?;
+    let best = candidates.last().ok_or(InspectPathError::ParseGen)?;
     dbg!(&best);
     Ok(())
 }

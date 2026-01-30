@@ -49,10 +49,26 @@
 //!
 //! Some operations (such as determining network mount status) may perform
 //! blocking I/O depending on the platform and filesystem.
-use std::{num::ParseIntError, path::PathBuf};
+use std::{
+    num::ParseIntError,
+    path::{Path, PathBuf},
+};
 use thiserror::Error;
+
 pub mod platform;
-pub use platform::{check_status, connect_drive, inspect_path, inspect_path_and_status};
+
+/// Always available APIs
+pub use platform::{check_status, inspect_path};
+
+/// Windows-only APIs
+#[cfg(any(windows, docsrs))]
+#[cfg_attr(docsrs, doc(cfg(windows)))]
+pub use platform::mount_path;
+
+// Unix-only APIs
+//#[cfg(unix)]
+//#[cfg_attr(docsrs, doc(cfg(unix)))]
+//pub use platform::inspect_path_new;
 
 #[derive(Debug, Error)]
 pub enum InspectPathError {
@@ -166,6 +182,44 @@ impl PathInfo {
     pub fn check_status(&mut self) {
         self.status = platform::check_status(&self.path);
     }
+}
+
+/// Inspects a filesystem path and immediately checks its mount status.
+///
+/// This is a convenience wrapper around [`inspect_path`] that also calls
+/// [`PathInfo::check_status`] before returning. It is useful when you want
+/// both the path classification and its current availability in one step.
+///
+/// On network-backed paths (such as SMB or WebDAV shares), checking status
+/// may perform blocking I/O and can be slower than calling [`inspect_path`]
+/// alone.
+///
+/// # Errors
+///
+/// Returns an error if the path type cannot be determined or if the platform
+/// inspection call fails.
+///
+/// # Examples
+///
+/// ```rust
+/// use std::path::Path;
+/// use inspect_path::inspect_path_and_status;
+///
+/// let info = inspect_path_and_status(Path::new(r"C:\")).unwrap();
+///
+/// if info.is_status_mounted() {
+///     println!("Path is available");
+/// }
+/// ```
+///
+/// # Platform behavior
+///
+/// - **Windows:** Uses Win32 APIs and filesystem probing
+/// - **Unix:** Uses `statfs` and filesystem metadata probing
+pub fn inspect_path_and_status(path: &Path) -> Result<PathInfo, InspectPathError> {
+    let mut inspect = inspect_path(path)?;
+    inspect.check_status();
+    Ok(inspect)
 }
 
 #[cfg(test)]
