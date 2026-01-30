@@ -1,6 +1,6 @@
 [package]
 name = "inspect_path"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "Cross-platform inspection of filesystem paths, including local and remote mounts."
 license = "MIT OR Apache-2.0"
@@ -12,6 +12,7 @@ categories = ["filesystem", "os"]
 
 
 [dependencies]
+cfg-if = "1.0.4"
 thiserror = "2.0.18"
 
 [target.'cfg(windows)'.dependencies]
