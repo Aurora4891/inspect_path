@@ -101,6 +101,7 @@ pub enum PathType {
     Remote,
     CDRom,
     RamDisk,
+    #[cfg(target_family = "unix")]
     Virtual(String),
 }
 
