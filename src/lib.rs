@@ -101,6 +101,8 @@ pub enum PathType {
     Remote,
     CDRom,
     RamDisk,
+    #[cfg(target_family = "unix")]
+    Virtual(String),
 }
 
 /// Information about a filesystem path, including its type and mount status.

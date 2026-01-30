@@ -39,6 +39,21 @@ pub const FS_FAT: i64 = 16390; // 0x4006 (FAT / FAT32 / MSDOS)
 /// Extended FAT
 pub const FS_EXFAT: i64 = 538032816; // 0x2011BAB0
 
+pub fn inspect_path_new(path: &Path) -> Result<(), InspectPathError> {
+    let miv = mountinfo_into_vec(&mountinfo_to_string()?)?;
+    let mut candidates: Vec<&MountInfo> = Vec::new();
+    for line in &miv {
+        if path.starts_with(&line.mount_point) {
+            candidates.push(&line);
+        }
+    }
+    candidates.sort_by_key(|m| m.mount_point.components().count());
+    let best = candidates
+        .last().ok_or(InspectPathError::ParseGen)?;
+    dbg!(&best);
+    Ok(())
+}
+
 pub fn inspect_path(path: &Path) -> Result<PathInfo, InspectPathError> {
     let statfs = statfs(path).map_err(|e| InspectPathError::General(e.to_string()))?;
 
@@ -68,13 +83,13 @@ pub fn check_status(path: &Path) -> PathStatus {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct DeviceNumber {
     major: u32,
     minor: u32,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct MountInfo {
     mount_id: u32,
     parent_id: u32,
