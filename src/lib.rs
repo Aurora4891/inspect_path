@@ -67,7 +67,7 @@ pub use platform::mount_path;
 // Unix-only APIs
 //#[cfg(unix)]
 //#[cfg_attr(docsrs, doc(cfg(unix)))]
-//pub use platform::inspect_path_new;
+pub use platform::inspect_path_new;
 
 #[derive(Debug, Error)]
 pub enum InspectPathError {
@@ -116,7 +116,8 @@ pub enum PathType {
     Remote,
     CDRom,
     RamDisk,
-    #[cfg(target_family = "unix")]
+    #[cfg(any(target_family = "unix", docsrs))]
+    /// unix only
     Virtual(String),
 }
 
@@ -147,6 +148,10 @@ impl PathInfo {
     }
     pub fn is_ramdisk(&self) -> bool {
         matches!(self.kind, PathType::RamDisk)
+    }
+    #[cfg(target_family = "unix")]
+    pub fn is_virtual(&self) -> bool {
+        matches!(self.kind, PathType::Virtual(_))
     }
     pub fn is_status_mounted(&self) -> bool {
         matches!(self.status, PathStatus::Mounted)

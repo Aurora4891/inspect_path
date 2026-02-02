@@ -1,11 +1,90 @@
 use crate::{InspectPathError, PathInfo, PathStatus, PathType, RemoteType};
 use nix::sys::statfs::statfs;
 use std::{
-    fs::read_to_string,
+    fs::{self, read_to_string},
     path::{Path, PathBuf},
 };
 
+// path to mountinfo
 const MOUNTINFO_PATH: &str = "/proc/self/mountinfo";
+// remote fs types
+const REMOTE_FS_TYPES: &[&[&str]] = &[
+    NFS,
+    SMB,
+    SSH,
+    CLUSTER,
+    PROTOCOL,
+    OTHER,
+];
+const NFS: &[&str] = &[
+    // NFS
+    "nfs",
+    "nfs4",
+];
+const SMB: &[&str] = &[
+    // SMB / CIFS
+    "cifs",
+    "smbfs",
+    "smb3",
+];
+const SSH: &[&str] = &[
+    // SSH
+    "sshfs",
+    "fuse.sshfs",
+];
+const CLUSTER: &[&str] = &[
+    // Cluster / distributed
+    "ceph",
+    "fuse.ceph",
+    "glusterfs",
+    "fuse.glusterfs",
+];
+const PROTOCOL: &[&str] = &[
+    // Network / protocol FS
+    "9p",
+    "afp",
+    "davfs",
+    "fuse.davfs",
+];
+const OTHER: &[&str] = &[
+    // Older / less common but still seen
+    "ncpfs",
+    "coda",
+    "ocfs2",
+    "gfs",
+    "gfs2",
+];
+// local fs types
+const LOCAL_BLOCK_FS_TYPES: &[&str] = &[
+    // Linux native
+    "ext2",
+    "ext3",
+    "ext4",
+    "xfs",
+    "btrfs",
+    "f2fs",
+    "jfs",
+    "reiserfs",
+    "reiser4",
+    "bcachefs",
+
+    // FAT family
+    "vfat",
+    "msdos",
+    "exfat",
+
+    // NTFS
+    "ntfs",
+    "ntfs3",
+
+    // ZFS (out of tree but common)
+    "zfs",
+];
+const CDROM_FS_TYPES: &[&str] = &[
+    // Optical / legacy media
+    "iso9660",
+    "udf",
+];
 // Filesystem magic numbers from statfs (base-10)
 /// Network File System (NFS)
 pub const FS_NFS: i64 = 26985;
@@ -39,18 +118,89 @@ pub const FS_FAT: i64 = 16390; // 0x4006 (FAT / FAT32 / MSDOS)
 /// Extended FAT
 pub const FS_EXFAT: i64 = 538032816; // 0x2011BAB0
 
-fn inspect_path_new(path: &Path) -> Result<(), InspectPathError> {
+pub fn inspect_path_new(path: &Path) -> Result<PathInfo, InspectPathError> {
     let miv = mountinfo_into_vec(&mountinfo_to_string()?)?;
-    let mut candidates: Vec<&MountInfo> = Vec::new();
-    for line in &miv {
-        if path.starts_with(&line.mount_point) {
-            candidates.push(line);
+let candidates: Vec<&MountInfo> = miv
+    .iter()
+    .filter(|m| path.starts_with(&m.mount_point))
+    .collect();
+
+let best = candidates
+    .into_iter()
+    .max_by_key(|m| m.mount_point.components().count())
+    .ok_or(InspectPathError::ParseGen)?;
+
+    let kind = get_kind(best)?;
+    let remote_kind = if kind != PathType::Remote {
+        None
+    } else {
+        get_remote_kind(best)?
+    };
+
+    Ok(PathInfo {
+        path: path.to_path_buf(),
+        kind,
+        remote_kind,
+        status: PathStatus::Unknown
+    })
+}
+
+fn expand_tilde(path: &Path) -> PathBuf {
+    let s = path.to_string_lossy();
+
+    if s == "~" || s.starts_with("~/") {
+        if let Some(home) = std::env::var_os("HOME")
+            .or_else(|| std::env::var_os("USERPROFILE"))
+        {
+            return PathBuf::from(home).join(s.trim_start_matches("~/"));
         }
     }
-    candidates.sort_by_key(|m| m.mount_point.components().count());
-    let best = candidates.last().ok_or(InspectPathError::ParseGen)?;
-    dbg!(&best);
-    Ok(())
+
+    path.to_path_buf()
+}
+
+fn get_kind(best: &MountInfo) -> Result<PathType, InspectPathError> {
+    let removable_path = format!("/sys/dev/block/{}:0/removeable", best.device_number.major);
+    let removable: u8 = fs::read_to_string(Path::new(&removable_path))
+    .unwrap_or_else(|_| "0".to_string())
+    .parse().map_err(|e| InspectPathError::ParseInt(e))?;
+    let fs_type = best.fs_type.as_str();
+
+    if best.device_number.major == 0 {
+            Ok(PathType::Virtual(fs_type.into()))
+        } else if removable == 1 {
+            Ok(PathType::Removable)
+        } else if CDROM_FS_TYPES.contains(&fs_type) {
+            Ok(PathType::CDRom)
+        } else if REMOTE_FS_TYPES.iter().any(|fst| fst.contains(&fs_type)) {
+            Ok(PathType::Remote)
+        } else if fs_type.starts_with("fuse") {
+            Ok(PathType::Unknown)
+        } else if LOCAL_BLOCK_FS_TYPES.contains(&fs_type) {
+            Ok(PathType::Fixed)
+        } else {
+            Ok(PathType::Unknown)
+        }
+    }
+
+fn get_remote_kind(best: &MountInfo) -> Result<Option<RemoteType>, InspectPathError> {
+    let fs_type = best.fs_type.as_str();
+
+    if NFS.contains(&fs_type) {
+        Ok(Some(RemoteType::NFS))
+    } else if SMB.contains(&fs_type) {
+        Ok(Some(RemoteType::SMB))
+    } else if SSH.contains(&fs_type) {
+        Ok(Some(RemoteType::Other("SSH".into())))
+    } else if CLUSTER.contains(&fs_type) {
+        Ok(Some(RemoteType::Other("Cluster / distributed".into())))
+    } else if PROTOCOL.contains(&fs_type) {
+        Ok(Some(RemoteType::Other("Network / protocol FS".into())))
+    } else if OTHER.contains(&fs_type) {
+        Ok(Some(RemoteType::Other("Other".into())))
+    } else {
+        Ok(Some(RemoteType::Unknown))
+    }
 }
 
 /// Inspects a filesystem path and returns detailed information about it.
@@ -221,6 +371,7 @@ fn mountinfo_into_vec(s: &str) -> Result<Vec<MountInfo>, InspectPathError> {
     Ok(out)
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 
