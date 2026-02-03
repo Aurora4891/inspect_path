@@ -50,8 +50,7 @@
 //! Some operations (such as determining network mount status) may perform
 //! blocking I/O depending on the platform and filesystem.
 use std::{
-    num::ParseIntError,
-    path::{Path, PathBuf},
+    fs, num::ParseIntError, path::{Path, PathBuf}
 };
 use thiserror::Error;
 
@@ -62,13 +61,11 @@ pub use platform::{check_status, inspect_path};
 
 /// Windows-only APIs
 #[cfg(any(windows, docsrs))]
-#[cfg_attr(docsrs, doc(cfg(windows)))]
 pub use platform::mount_path;
 
 // Unix-only APIs
 //#[cfg(unix)]
 //#[cfg_attr(docsrs, doc(cfg(unix)))]
-//pub use platform::inspect_path_new;
 
 #[derive(Debug, Error)]
 pub enum InspectPathError {
@@ -117,7 +114,8 @@ pub enum PathType {
     Remote,
     CDRom,
     RamDisk,
-    #[cfg(target_family = "unix")]
+    #[cfg(any(target_family = "unix", docsrs))]
+    /// unix only
     Virtual(String),
 }
 
@@ -128,6 +126,10 @@ pub enum PathType {
 #[derive(Debug, PartialEq)]
 pub struct PathInfo {
     path: PathBuf,
+    #[cfg(target_family = "unix")]
+    resolved_path: Option<PathBuf>,
+    #[cfg(target_family = "unix")]
+    is_symlink: bool,
     kind: PathType,
     remote_kind: Option<RemoteType>,
     status: PathStatus,
@@ -149,6 +151,14 @@ impl PathInfo {
     pub fn is_ramdisk(&self) -> bool {
         matches!(self.kind, PathType::RamDisk)
     }
+    #[cfg(target_family = "unix")]
+    pub fn is_virtual(&self) -> bool {
+        matches!(self.kind, PathType::Virtual(_))
+    }
+    #[cfg(target_family = "unix")]
+    pub fn is_symlink(&self) -> bool {
+        self.is_symlink
+    }
     pub fn is_status_mounted(&self) -> bool {
         matches!(self.status, PathStatus::Mounted)
     }
@@ -161,6 +171,10 @@ impl PathInfo {
     pub fn path(&self) -> &PathBuf {
         &self.path
     }
+    #[cfg(target_family = "unix")]
+    pub fn resolved_path(&self) -> &Option<PathBuf> {
+        &self.resolved_path
+    }
     pub fn kind(&self) -> &PathType {
         &self.kind
     }
@@ -171,14 +185,6 @@ impl PathInfo {
         self.remote_kind.as_ref()
     }
 
-    /// Updates the mount status of the path.
-    ///
-    /// This function attempts to access the underlying filesystem to determine
-    /// whether the path is currently mounted or disconnected. On network paths,
-    /// this may perform a blocking I/O operation.
-    ///
-    /// The status is updated based on the result of probing the path and is
-    /// stored in the `status` field.
     pub fn check_status(&mut self) {
         self.status = platform::check_status(&self.path);
     }
@@ -202,6 +208,8 @@ impl PathInfo {
 /// # Examples
 ///
 /// ```rust
+/// # #[cfg(target_os = "windows")]
+/// # {
 /// use std::path::Path;
 /// use inspect_path::inspect_path_and_status;
 ///
@@ -210,6 +218,18 @@ impl PathInfo {
 /// if info.is_status_mounted() {
 ///     println!("Path is available");
 /// }
+/// # }
+/// # #[cfg(target_family = "unix")]
+/// # {
+/// use std::path::Path;
+/// use inspect_path::inspect_path_and_status;
+///
+/// let info = inspect_path_and_status(Path::new(r"/home/")).unwrap();
+///
+/// if info.is_status_mounted() {
+///     println!("Path is available");
+/// }
+/// # }
 /// ```
 ///
 /// # Platform behavior
@@ -220,6 +240,27 @@ pub fn inspect_path_and_status(path: &Path) -> Result<PathInfo, InspectPathError
     let mut inspect = inspect_path(path)?;
     inspect.check_status();
     Ok(inspect)
+}
+
+fn get_resolved_path(path: &Path) -> (Option<PathBuf>, bool) {
+    let s = path.to_string_lossy();
+    let mut expanded = path.to_path_buf();
+
+    if s == "~" || s.starts_with("~/") {
+        if let Some(home) = std::env::var_os("HOME")
+            .or_else(|| std::env::var_os("USERPROFILE"))
+        {
+            expanded = PathBuf::from(home).join(s.trim_start_matches("~/"));
+        }
+    }
+
+    let resolved = fs::canonicalize(&expanded).ok();
+
+    let is_symlink = fs::symlink_metadata(&expanded)
+    .map(|m| m.file_type().is_symlink())
+    .unwrap_or(false);
+
+    (resolved, is_symlink)
 }
 
 #[cfg(test)]
@@ -249,6 +290,8 @@ mod tests {
     fn fixed_path_type() {
         let path_type = PathInfo {
             path: Path::new(r"/etc/").to_path_buf(),
+            resolved_path: Some(PathBuf::from("/etc")),
+            is_symlink: false,
             kind: PathType::Fixed,
             remote_kind: None,
             status: PathStatus::Unknown,
