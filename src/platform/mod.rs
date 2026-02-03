@@ -15,7 +15,7 @@ cfg_if::cfg_if! {
         }
     } else if #[cfg(target_family = "unix")] {
         mod unix;
-        pub use unix::{inspect_path, inspect_path_new};
+        pub use unix::inspect_path;
 
         /// Probes a path to determine its current mount/connection status.
         ///
