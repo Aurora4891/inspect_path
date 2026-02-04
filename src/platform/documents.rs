@@ -1,4 +1,5 @@
 use crate::{InspectPathError, inspect_path, inspect_path_and_status};
+use std::path::Path;
 
 /// Connects (maps) a network share to a local drive letter on Windows.
 ///

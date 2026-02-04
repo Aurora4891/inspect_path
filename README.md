@@ -38,7 +38,7 @@ platform-specific details behind a simple, consistent API.
 - Local filesystems (ext4, xfs, btrfs, etc.)
 - Network filesystems (NFS, SMB/CIFS, AFS)
 - tmpfs and optical media
-- Uses filesystem magic numbers via `statfs`
+- Finds filesystem info by parsing '/proc/self/mountinfo'
 
 > Some filesystem details cannot be inferred on all platforms
 > (for example, Linux cannot always distinguish NTFS backing devices).
