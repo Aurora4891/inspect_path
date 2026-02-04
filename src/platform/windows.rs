@@ -281,3 +281,25 @@ pub fn mount_path(local: &str, remote: &str) -> Result<(), InspectPathError> {
         )))
     }
 }
+
+pub fn try_mount_if_needed(path: &Path, remote: &Path) -> Result<(), InspectPathError> {
+    if let Err(e) = inspect_path(path) {
+        match e {
+            InspectPathError::InvalidPath(_) => {
+                mount_path(
+                    path.to_string_lossy()
+                        .chars()
+                        .take(2)
+                        .collect::<String>()
+                        .as_str(),
+                    remote
+                        .to_str()
+                        .ok_or(InspectPathError::General("Conversion Error".into()))?,
+                )?;
+            }
+            e => return Err(e),
+        }
+    };
+
+    Ok(())
+}

@@ -7,24 +7,14 @@ use std::{
 // path to mountinfo
 const MOUNTINFO_PATH: &str = "/proc/self/mountinfo";
 // remote fs types
-const REMOTE_FS_TYPES: &[&[&str]] = &[
-    NFS,
-    SMB,
-    SSH,
-    CLUSTER,
-    PROTOCOL,
-    OTHER,
-];
+const REMOTE_FS_TYPES: &[&[&str]] = &[NFS, SMB, SSH, CLUSTER, PROTOCOL, OTHER];
 const NFS: &[&str] = &[
     // NFS
-    "nfs",
-    "nfs4",
+    "nfs", "nfs4",
 ];
 const SMB: &[&str] = &[
     // SMB / CIFS
-    "cifs",
-    "smbfs",
-    "smb3",
+    "cifs", "smbfs", "smb3",
 ];
 const SSH: &[&str] = &[
     // SSH
@@ -47,68 +37,21 @@ const PROTOCOL: &[&str] = &[
 ];
 const OTHER: &[&str] = &[
     // Older / less common but still seen
-    "ncpfs",
-    "coda",
-    "ocfs2",
-    "gfs",
-    "gfs2",
+    "ncpfs", "coda", "ocfs2", "gfs", "gfs2",
 ];
 // local fs types
 const LOCAL_BLOCK_FS_TYPES: &[&str] = &[
     // Linux native
-    "ext2",
-    "ext3",
-    "ext4",
-    "xfs",
-    "btrfs",
-    "f2fs",
-    "jfs",
-    "reiserfs",
-    "reiser4",
-    "bcachefs",
-
+    "ext2", "ext3", "ext4", "xfs", "btrfs", "f2fs", "jfs", "reiserfs", "reiser4", "bcachefs",
     // FAT family
-    "vfat",
-    "msdos",
-    "exfat",
-
-    // NTFS
-    "ntfs",
-    "ntfs3",
-
-<<<<<<< HEAD
-/// XFS
-pub const FS_XFS: i64 = 1481003842; // 0x58465342
-/// New Technology File System (NTFS)
-pub const FS_NTFS: i64 = 1397118030; // 0x5346544E
-/// FAT / FAT32 / MSDOS
-pub const FS_FAT: i64 = 16390; // 0x4006 (FAT / FAT32 / MSDOS)
-/// Extended FAT
-pub const FS_EXFAT: i64 = 538032816; // 0x2011BAB0
-
-pub fn inspect_path_new(path: &Path) -> Result<(), InspectPathError> {
-    let miv = mountinfo_into_vec(&mountinfo_to_string()?)?;
-    let mut candidates: Vec<&MountInfo> = Vec::new();
-    for line in &miv {
-        if path.starts_with(&line.mount_point) {
-            candidates.push(&line);
-        }
-    }
-    candidates.sort_by_key(|m| m.mount_point.components().count());
-    let best = candidates.last().ok_or(InspectPathError::ParseGen)?;
-    dbg!(&best);
-    Ok(())
-}
-=======
-    // ZFS (out of tree but common)
+    "vfat", "msdos", "exfat", // NTFS
+    "ntfs", "ntfs3", // ZFS (out of tree but common)
     "zfs",
 ];
 const CDROM_FS_TYPES: &[&str] = &[
     // Optical / legacy media
-    "iso9660",
-    "udf",
+    "iso9660", "udf",
 ];
->>>>>>> mountinfo
 
 /// Inspects a filesystem path and returns detailed information about it.
 ///
@@ -125,20 +68,21 @@ pub fn inspect_path(path: &Path) -> Result<PathInfo, InspectPathError> {
     let (resolved_path, is_symlink) = get_resolved_path(path);
 
     let miv = mountinfo_into_vec(&mountinfo_to_string()?)?;
-let candidates: Vec<&MountInfo> = miv
-    .iter()
-    .filter(|m| 
-        if let Some(rp) = &resolved_path {
-            rp.starts_with(&m.mount_point)
-        } else {
-            path.starts_with(&m.mount_point)
+    let candidates: Vec<&MountInfo> = miv
+        .iter()
+        .filter(|m| {
+            if let Some(rp) = &resolved_path {
+                rp.starts_with(&m.mount_point)
+            } else {
+                path.starts_with(&m.mount_point)
+            }
         })
-    .collect();
+        .collect();
 
-let best = candidates
-    .into_iter()
-    .max_by_key(|m| m.mount_point.components().count())
-    .ok_or(InspectPathError::ParseGen)?;
+    let best = candidates
+        .into_iter()
+        .max_by_key(|m| m.mount_point.components().count())
+        .ok_or(InspectPathError::ParseGen)?;
 
     let kind = get_kind(best)?;
     let remote_kind = if kind != PathType::Remote {
@@ -153,33 +97,34 @@ let best = candidates
         is_symlink,
         kind,
         remote_kind,
-        status: PathStatus::Unknown
+        status: PathStatus::Unknown,
     })
 }
 
 fn get_kind(best: &MountInfo) -> Result<PathType, InspectPathError> {
     let removable_path = format!("/sys/dev/block/{}:0/removable", best.device_number.major);
     let removable: u8 = fs::read_to_string(Path::new(&removable_path))
-    .unwrap_or_else(|_| "0".to_string())
-    .parse().map_err(|e| InspectPathError::ParseInt(e))?;
+        .unwrap_or_else(|_| "0".to_string())
+        .parse()
+        .map_err(|e| InspectPathError::ParseInt(e))?;
     let fs_type = best.fs_type.as_str();
 
     if best.device_number.major == 0 {
-            Ok(PathType::Virtual(fs_type.into()))
-        } else if removable == 1 {
-            Ok(PathType::Removable)
-        } else if CDROM_FS_TYPES.contains(&fs_type) {
-            Ok(PathType::CDRom)
-        } else if REMOTE_FS_TYPES.iter().any(|fst| fst.contains(&fs_type)) {
-            Ok(PathType::Remote)
-        } else if fs_type.starts_with("fuse") {
-            Ok(PathType::Unknown)
-        } else if LOCAL_BLOCK_FS_TYPES.contains(&fs_type) {
-            Ok(PathType::Fixed)
-        } else {
-            Ok(PathType::Unknown)
-        }
+        Ok(PathType::Virtual(fs_type.into()))
+    } else if removable == 1 {
+        Ok(PathType::Removable)
+    } else if CDROM_FS_TYPES.contains(&fs_type) {
+        Ok(PathType::CDRom)
+    } else if REMOTE_FS_TYPES.iter().any(|fst| fst.contains(&fs_type)) {
+        Ok(PathType::Remote)
+    } else if fs_type.starts_with("fuse") {
+        Ok(PathType::Unknown)
+    } else if LOCAL_BLOCK_FS_TYPES.contains(&fs_type) {
+        Ok(PathType::Fixed)
+    } else {
+        Ok(PathType::Unknown)
     }
+}
 
 fn get_remote_kind(best: &MountInfo) -> Result<Option<RemoteType>, InspectPathError> {
     let fs_type = best.fs_type.as_str();
