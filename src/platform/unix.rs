@@ -146,6 +146,25 @@ fn get_remote_kind(best: &MountInfo) -> Result<Option<RemoteType>, InspectPathEr
     }
 }
 
+fn get_resolved_path(path: &Path) -> (Option<PathBuf>, bool) {
+    let s = path.to_string_lossy();
+    let mut expanded = path.to_path_buf();
+
+    if s == "~" || s.starts_with("~/") {
+        if let Some(home) = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")) {
+            expanded = PathBuf::from(home).join(s.trim_start_matches("~/"));
+        }
+    }
+
+    let resolved = fs::canonicalize(&expanded).ok();
+
+    let is_symlink = fs::symlink_metadata(&expanded)
+        .map(|m| m.file_type().is_symlink())
+        .unwrap_or(false);
+
+    (resolved, is_symlink)
+}
+
 /// Probes a path to determine its current mount/connection status.
 ///
 /// This function attempts to access filesystem metadata for the given path

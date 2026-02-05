@@ -50,7 +50,6 @@
 //! Some operations (such as determining network mount status) may perform
 //! blocking I/O depending on the platform and filesystem.
 use std::{
-    fs,
     num::ParseIntError,
     path::{Path, PathBuf},
 };
@@ -242,25 +241,6 @@ pub fn inspect_path_and_status(path: &Path) -> Result<PathInfo, InspectPathError
     let mut inspect = inspect_path(path)?;
     inspect.check_status();
     Ok(inspect)
-}
-
-pub(crate) fn get_resolved_path(path: &Path) -> (Option<PathBuf>, bool) {
-    let s = path.to_string_lossy();
-    let mut expanded = path.to_path_buf();
-
-    if s == "~" || s.starts_with("~/") {
-        if let Some(home) = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")) {
-            expanded = PathBuf::from(home).join(s.trim_start_matches("~/"));
-        }
-    }
-
-    let resolved = fs::canonicalize(&expanded).ok();
-
-    let is_symlink = fs::symlink_metadata(&expanded)
-        .map(|m| m.file_type().is_symlink())
-        .unwrap_or(false);
-
-    (resolved, is_symlink)
 }
 
 #[cfg(test)]
