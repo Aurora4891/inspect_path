@@ -252,8 +252,27 @@ fn to_pwstr(s: &str) -> Vec<u16> {
 /// - [`inspect_path`] — inspect mapped drives after connecting
 /// - [`inspect_path_and_status`] — inspect and verify availability
 pub fn mount_path(local: &str, remote: &str) -> Result<(), InspectPathError> {
+    mount_path_as_user(local, remote, None, None)?;
+    Ok(())
+}
+
+pub fn mount_path_as_user(local: &str, remote: &str, user: Option<&str>, password: Option<&str>) -> Result<(), InspectPathError> {
     let mut local = to_pwstr(local); // "Z:"
     let mut remote = to_pwstr(remote); // r"\\server\share"
+    let user =  match user {
+        Some(u) => {
+            let vec = to_pwstr(u);
+            PCWSTR::from_raw(vec.as_ptr())
+        }
+        None => PCWSTR::null(),
+    };
+    let password =  match password {
+        Some(p) => {
+            let vec = to_pwstr(p);
+            PCWSTR::from_raw(vec.as_ptr())
+        }
+        None => PCWSTR::null(),
+    };
 
     let nr = NETRESOURCEW {
         dwType: RESOURCETYPE_DISK,
@@ -266,8 +285,8 @@ pub fn mount_path(local: &str, remote: &str) -> Result<(), InspectPathError> {
     let result = unsafe {
         WNetAddConnection2W(
             &nr,
-            PCWSTR::null(), // password
-            PCWSTR::null(), // username
+            user, // password
+            password, // username
             windows::Win32::NetworkManagement::WNet::NET_CONNECT_FLAGS(0),
         )
     };
