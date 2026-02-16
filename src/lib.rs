@@ -62,7 +62,7 @@ pub use platform::{check_status, inspect_path};
 
 /// Windows-only APIs
 #[cfg(any(windows, docsrs))]
-pub use platform::{mount_path, try_mount_if_needed};
+pub use platform::{mount_path, mount_path_as_user, try_mount_if_needed};
 
 // Unix-only APIs
 //#[cfg(unix)]

@@ -122,12 +122,7 @@ fn get_universal_name(wide: &[u16]) -> Option<String> {
 
     let un = buffer.as_ptr() as *const UNIVERSAL_NAME_INFOW;
 
-    unsafe {
-        match (*un).lpUniversalName.to_string() {
-            Ok(uni_name) => Some(uni_name),
-            Err(_) => None,
-        }
-    }
+    unsafe { (*un).lpUniversalName.to_string().ok() }
 }
 
 /// Probes a path to determine its current mount/connection status.
@@ -211,68 +206,42 @@ fn to_pwstr(s: &str) -> Vec<u16> {
     v
 }
 
-/// Connects (maps) a network share to a local drive letter on Windows.
-///
-/// This function wraps the Win32 `WNetAddConnection2W` API to create a mapped
-/// network drive. The mapping is created for disk resources only.
-///
-/// # Parameters
-///
-/// * `local` — Local drive name such as `"Z:"`
-/// * `remote` — Remote UNC path such as `"\\\\server\\share"`
-///
-/// Both parameters must be valid Windows path strings.
-///
-/// # Errors
-///
-/// Returns an error if the Win32 API call fails. The error variant will
-/// contain the raw Win32 error code as text.
-///
-/// # Examples
-///
-/// ```rust,no_run
-/// use inspect_path::mount_path;
-///
-/// mount_path("Z:", r"\\server\share").unwrap();
-/// ```
-///
-/// # Platform
-///
-/// **Windows only.** This function is not available on Unix platforms.
-///
-/// # Notes
-///
-/// - This call may prompt for credentials depending on system configuration.
-/// - Existing mappings using the same drive letter may cause failure.
-/// - The connection is created using default credentials unless otherwise configured.
-/// - This function performs a system-level change.
-///
-/// # See also
-///
-/// - [`inspect_path`] — inspect mapped drives after connecting
-/// - [`inspect_path_and_status`] — inspect and verify availability
 pub fn mount_path(local: &str, remote: &str) -> Result<(), InspectPathError> {
-    mount_path_as_user(local, remote, None, None)?;
+    mount_path_internal(local, remote, None, None)?;
     Ok(())
 }
 
-pub fn mount_path_as_user(local: &str, remote: &str, user: Option<&str>, password: Option<&str>) -> Result<(), InspectPathError> {
+pub fn mount_path_as_user(
+    local: &str,
+    remote: &str,
+    user: &str,
+    password: &str,
+) -> Result<(), InspectPathError> {
+    mount_path_internal(local, remote, Some(user), Some(password))?;
+    Ok(())
+}
+
+fn mount_path_internal(
+    local: &str,
+    remote: &str,
+    user: Option<&str>,
+    password: Option<&str>,
+) -> Result<(), InspectPathError> {
     let mut local = to_pwstr(local); // "Z:"
     let mut remote = to_pwstr(remote); // r"\\server\share"
-    let user =  match user {
-        Some(u) => {
-            let vec = to_pwstr(u);
-            PCWSTR::from_raw(vec.as_ptr())
-        }
-        None => PCWSTR::null(),
-    };
-    let password =  match password {
-        Some(p) => {
-            let vec = to_pwstr(p);
-            PCWSTR::from_raw(vec.as_ptr())
-        }
-        None => PCWSTR::null(),
-    };
+
+    let user_buf = user.map(to_pwstr);
+    let pass_buf = password.map(to_pwstr);
+
+    let user_pcw = user_buf
+        .as_ref()
+        .map(|v| PCWSTR::from_raw(v.as_ptr()))
+        .unwrap_or(PCWSTR::null());
+
+    let pass_pcw = pass_buf
+        .as_ref()
+        .map(|v| PCWSTR::from_raw(v.as_ptr()))
+        .unwrap_or(PCWSTR::null());
 
     let nr = NETRESOURCEW {
         dwType: RESOURCETYPE_DISK,
@@ -285,8 +254,8 @@ pub fn mount_path_as_user(local: &str, remote: &str, user: Option<&str>, passwor
     let result = unsafe {
         WNetAddConnection2W(
             &nr,
-            user, // password
-            password, // username
+            pass_pcw, // password
+            user_pcw, // username
             windows::Win32::NetworkManagement::WNet::NET_CONNECT_FLAGS(0),
         )
     };
