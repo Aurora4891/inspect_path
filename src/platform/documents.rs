@@ -59,7 +59,6 @@ pub fn mount_path(local: &str, remote: &str) -> Result<(), InspectPathError> {}
 /// * `user` — User name such as `"tom"`
 /// * `password` — User password such as `"password123!"`
 ///
-/// Both parameters must be valid Windows path strings.
 ///
 /// # Errors
 ///
