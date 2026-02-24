@@ -4,12 +4,12 @@ use std::path::Path;
 #[cfg(docsrs)]
 mod documents;
 #[cfg(docsrs)]
-pub use documents::{mount_path, try_mount_if_needed};
+pub use documents::{mount_path, mount_path_as_user, try_mount_if_needed};
 
 cfg_if::cfg_if! {
     if #[cfg(target_os = "windows")] {
         mod windows;
-        pub use windows::{inspect_path, mount_path, try_mount_if_needed};
+        pub use windows::{inspect_path, mount_path, mount_path_as_user, try_mount_if_needed};
         pub fn check_status(path: &Path) -> PathStatus {
             windows::check_status(path)
         }

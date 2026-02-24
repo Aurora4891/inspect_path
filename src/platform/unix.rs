@@ -1,4 +1,4 @@
-use crate::{InspectPathError, PathInfo, PathStatus, PathType, RemoteType, get_resolved_path};
+use crate::{InspectPathError, PathInfo, PathStatus, PathType, RemoteType};
 use std::{
     fs::{self, read_to_string},
     path::{Path, PathBuf},
@@ -105,6 +105,7 @@ fn get_kind(best: &MountInfo) -> Result<PathType, InspectPathError> {
     let removable_path = format!("/sys/dev/block/{}:0/removable", best.device_number.major);
     let removable: u8 = fs::read_to_string(Path::new(&removable_path))
         .unwrap_or_else(|_| "0".to_string())
+        .trim()
         .parse()
         .map_err(|e| InspectPathError::ParseInt(e))?;
     let fs_type = best.fs_type.as_str();
