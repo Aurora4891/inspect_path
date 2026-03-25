@@ -1,6 +1,8 @@
 use crate::{InspectPathError, inspect_path, inspect_path_and_status};
 use std::path::Path;
 
+/// **Windows only.** This function is not available on Unix platforms yet.
+///
 /// Connects (maps) a network share to a local drive letter on Windows.
 ///
 /// This function wraps the Win32 `WNetAddConnection2W` API to create a mapped
@@ -43,6 +45,8 @@ use std::path::Path;
 /// - [`inspect_path_and_status`] — inspect and verify availability
 pub fn mount_path(local: &str, remote: &str) -> Result<(), InspectPathError> {}
 
+/// **Windows only.** This function is not available on Unix platforms yet.
+///
 /// Connects (maps) a network share to a local drive letter on Windows.
 ///
 /// This function wraps the Win32 `WNetAddConnection2W` API to create a mapped
@@ -55,7 +59,6 @@ pub fn mount_path(local: &str, remote: &str) -> Result<(), InspectPathError> {}
 /// * `user` — User name such as `"tom"`
 /// * `password` — User password such as `"password123!"`
 ///
-/// Both parameters must be valid Windows path strings.
 ///
 /// # Errors
 ///
@@ -93,6 +96,8 @@ pub fn mount_path_as_user(
 ) -> Result<(), InspectPathError> {
 }
 
+/// **Windows only.** This function is not available on Unix platforms yet.
+///
 /// Attempts to mount a drive/share if the given path is not currently available.
 ///
 /// This helper checks whether `path` is accessible using [`inspect_path`]. If the path
