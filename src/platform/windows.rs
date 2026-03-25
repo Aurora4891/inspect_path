@@ -291,3 +291,28 @@ pub fn try_mount_if_needed(path: &Path, remote: &Path) -> Result<(), InspectPath
 
     Ok(())
 }
+
+pub fn try_mount_if_needed_as_user(path: &Path, remote: &Path, user: &str, password: &str) -> Result<(), InspectPathError> {
+    if let Err(e) = inspect_path(path) {
+        match e {
+            InspectPathError::InvalidPath(_) => {
+                mount_path_as_user(
+                    path.to_string_lossy()
+                        .chars()
+                        .take(2)
+                        .collect::<String>()
+                        .as_str(),
+                    remote
+                        .to_str()
+                        .ok_or(InspectPathError::General("Conversion Error".into()))?,
+                    user,
+                    password
+                        
+                )?;
+            }
+            e => return Err(e),
+        }
+    };
+
+    Ok(())
+}
